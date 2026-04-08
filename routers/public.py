@@ -9,11 +9,11 @@ router = APIRouter()
 @router.get("/init")
 async def init(r=Depends(get_redis)):
     """Bootstrap público — metadados + arcos do mapa."""
-    metadata, map_intentions = await asyncio.gather(
+    metadata, map_interests = await asyncio.gather(
         db.get_all_metadata(r),
-        db.get_map_intentions(r),
+        db.get_map_interests(r),
     )
-    return {"metadata": metadata, "map_intentions": map_intentions}
+    return {"metadata": metadata, "map_interests": map_interests}
 
 
 @router.get("/map/arc")
@@ -23,26 +23,26 @@ async def get_arc_users(
     r=Depends(get_redis),
 ):
     """
-    Retorna os usuários que têm intenção no arco from_key→to_key.
+    Retorna os usuários que têm interesse no arco from_key→to_key.
     Inclui perfil público (sem phone/email — só liberado após match confirmado).
     """
-    all_keys = await r.keys("intention:*")
+    all_keys = await r.keys("interest:*")
     if not all_keys:
         return {"users": []}
 
     pipe = r.pipeline()
     for k in all_keys:
         pipe.hgetall(k)
-    intentions = await pipe.execute()
+    interests = await pipe.execute()
 
-    # Filtra intenções compatíveis com o arco
+    # Filtra interesses compatíveis com o arco
     matching_usernames = set()
-    for intent in intentions:
-        if not intent:
+    for interest in interests:
+        if not interest:
             continue
         # from_key é sempre base:XXX
         user_base = None
-        username  = intent.get("username")
+        username  = interest.get("username")
         if not username:
             continue
         user = await r.hgetall(f"user:{username}")
@@ -52,10 +52,10 @@ async def get_arc_users(
         if user_base != from_key:
             continue
 
-        # Verifica se o destino da intenção bate com to_key
-        target_base   = intent.get("target_base_id",   "0")
-        target_region = intent.get("target_region_id", "0")
-        target_state  = intent.get("target_state_id",  "0")
+        # Verifica se o destino d bate com to_key
+        target_base   = interest.get("target_base_id",   "0")
+        target_region = interest.get("target_region_id", "0")
+        target_state  = interest.get("target_state_id",  "0")
 
         to_type, to_id = to_key.split(":", 1)
         matched = False

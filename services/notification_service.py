@@ -148,7 +148,7 @@ def _build_email_html(match: dict, chain_display: str, frontend_url: str) -> str
                         <tr>
                             <td style="padding: 40px 30px;">
                                 <h2 style="color: #0f172a; margin-top: 0; font-size: 22px;">Nova Permuta Encontrada! 🎉</h2>
-                                <p style="color: #475569; line-height: 1.6; font-size: 16px;">O algoritmo do Triangula identificou um novo ciclo de permuta compatível com suas intenções.</p>
+                                <p style="color: #475569; line-height: 1.6; font-size: 16px;">O algoritmo do Triangula identificou um novo ciclo de permuta compatível com seus interesses.</p>
                                 
                                 <table width="100%" cellpadding="0" cellspacing="0" style="margin: 25px 0;">
                                     <tr>

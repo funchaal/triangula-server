@@ -7,8 +7,8 @@ Estado do usuário:
                       (ele "sai de graça", então pode fechar ciclo sem contrapartida para sua base)
 
 Recálculo inteligente:
-  Dado um gatilho (nova intenção, intenção removida, perfil atualizado),
-  identifica apenas as intenções com relação de origem/destino com o gatilho
+  Dado um gatilho (novo interesse, interesse removido, perfil atualizado),
+  identifica apenas os interesses com relação de origem/destino com o gatilho
   e reavalia só elas — não varre o sistema inteiro.
 """
 import asyncio
@@ -46,9 +46,9 @@ async def recalculate_matches_for_user(r, trigger_username: str):
         user = await db.get_user(r, username)
         if not user:
             continue
-        intentions = await db.get_user_intentions(r, username)
-        for intention in intentions:
-            cycles = await _try_close_cycles(r, username, user, intention)
+        interests = await db.get_user_interests(r, username)
+        for interest in interests:
+            cycles = await _try_close_cycles(r, username, user, interest)
             new_chains_found.extend(cycles)
 
     # 4. Mapeia os novos ciclos válidos encontrados
@@ -74,28 +74,28 @@ async def recalculate_matches_for_user(r, trigger_username: str):
 
 async def _find_related_users(r, trigger_username: str, trigger_user: dict) -> set:
     related = set()
-    all_intentions = await db.get_all_intentions(r)
-    trigger_intentions = await db.get_user_intentions(r, trigger_username)
+    all_interests = await db.get_all_interests(r)
+    trigger_interests = await db.get_user_interests(r, trigger_username)
 
     # Localidade atual do usuário trigger
     t_base = str(trigger_user.get("base_id", "0"))
     t_region = str(trigger_user.get("region_id", "0"))
     t_state = str(trigger_user.get("state_id", "0"))
 
-    # Alvos das intenções do usuário trigger
-    t_targets_base = {str(i.get("target_base_id", "0")) for i in trigger_intentions} - {"0"}
-    t_targets_region = {str(i.get("target_region_id", "0")) for i in trigger_intentions} - {"0"}
-    t_targets_state = {str(i.get("target_state_id", "0")) for i in trigger_intentions} - {"0"}
+    # Alvos dos interesses do usuário trigger
+    t_targets_base = {str(i.get("target_base_id", "0")) for i in trigger_interests} - {"0"}
+    t_targets_region = {str(i.get("target_region_id", "0")) for i in trigger_interests} - {"0"}
+    t_targets_state = {str(i.get("target_state_id", "0")) for i in trigger_interests} - {"0"}
 
-    for intent in all_intentions:
-        uname = intent.get("username")
+    for interest in all_interests:
+        uname = interest.get("username")
         if not uname or uname == trigger_username:
             continue
 
         # 1. Este usuário quer ir para a base/região/estado do trigger?
-        i_base = str(intent.get("target_base_id", "0"))
-        i_region = str(intent.get("target_region_id", "0"))
-        i_state = str(intent.get("target_state_id", "0"))
+        i_base = str(interest.get("target_base_id", "0"))
+        i_region = str(interest.get("target_region_id", "0"))
+        i_state = str(interest.get("target_state_id", "0"))
 
         if (i_base != "0" and i_base == t_base) or \
            (i_region != "0" and i_region == t_region) or \
@@ -117,14 +117,14 @@ async def _find_related_users(r, trigger_username: str, trigger_user: dict) -> s
 
     return related
 
-async def _try_close_cycles(r, origin_username: str, origin_user: dict, intention: dict) -> list:
+async def _try_close_cycles(r, origin_username: str, origin_user: dict, interest: dict) -> list:
     """
-    Para uma intenção específica, busca candidatos e retorna os ciclos fechados em memória.
+    Para um interesse específico, busca candidatos e retorna os ciclos fechados em memória.
     """
     found_cycles = []
     origin_base = origin_user.get("base_id", "0")
 
-    candidates = await _get_candidates(r, origin_user, intention)
+    candidates = await _get_candidates(r, origin_user, interest)
     candidates.discard(origin_username)
 
     for candidate in candidates:
@@ -146,14 +146,14 @@ async def _try_close_cycles(r, origin_username: str, origin_user: dict, intentio
 
 # ─── Candidatos via SINTER ────────────────────────────────────────────────────
 
-async def _get_candidates(r, user: dict, intention: dict) -> set:
+async def _get_candidates(r, user: dict, interest: dict) -> set:
     """
-    Retorna usuários que estão na localidade alvo da intenção.
+    Retorna usuários que estão na localidade alvo do interesse.
     """
     loc_keys = []
-    target_base   = str(intention.get("target_base_id",   "0"))
-    target_region = str(intention.get("target_region_id", "0"))
-    target_state  = str(intention.get("target_state_id",  "0"))
+    target_base   = str(interest.get("target_base_id",   "0"))
+    target_region = str(interest.get("target_region_id", "0"))
+    target_state  = str(interest.get("target_state_id",  "0"))
 
     if target_base != "0":
         loc_keys.append(f"index:location:{target_base}:users")
@@ -163,14 +163,14 @@ async def _get_candidates(r, user: dict, intention: dict) -> set:
         loc_keys.append(f"index:state:{target_state}:users")
 
     extra_keys = []
-    if str(intention.get("target_role_id",       "0")) != "0":
-        extra_keys.append(f"index:role:{intention['target_role_id']}:users")
-    if str(intention.get("target_role_type_id",  "0")) != "0":
-        extra_keys.append(f"index:role_type:{intention['target_role_type_id']}:users")
-    if str(intention.get("target_department_id", "0")) != "0":
-        extra_keys.append(f"index:department:{intention['target_department_id']}:users")
-    if str(intention.get("target_regime_id",     "0")) != "0":
-        extra_keys.append(f"index:regime:{intention['target_regime_id']}:users")
+    if str(interest.get("target_role_id",       "0")) != "0":
+        extra_keys.append(f"index:role:{interest['target_role_id']}:users")
+    if str(interest.get("target_role_type_id",  "0")) != "0":
+        extra_keys.append(f"index:role_type:{interest['target_role_type_id']}:users")
+    if str(interest.get("target_department_id", "0")) != "0":
+        extra_keys.append(f"index:department:{interest['target_department_id']}:users")
+    if str(interest.get("target_regime_id",     "0")) != "0":
+        extra_keys.append(f"index:regime:{interest['target_regime_id']}:users")
 
     all_keys = loc_keys + extra_keys
     if not all_keys:
@@ -179,13 +179,13 @@ async def _get_candidates(r, user: dict, intention: dict) -> set:
         return set(await r.smembers(all_keys[0]))
     return set(await r.sinter(*all_keys))
 
-def _intention_matches_user(intention: dict, user: dict) -> bool:
-    """Verifica se a intenção satisfaz a localização e o perfil completo do usuário alvo."""
+def _interest_matches_user(interest: dict, user: dict) -> bool:
+    """Verifica se o interesse satisfaz a localização e o perfil completo do usuário alvo."""
     
     # 1. Validação de Localização
-    t_base = str(intention.get("target_base_id", "0"))
-    t_region = str(intention.get("target_region_id", "0"))
-    t_state = str(intention.get("target_state_id", "0"))
+    t_base = str(interest.get("target_base_id", "0"))
+    t_region = str(interest.get("target_region_id", "0"))
+    t_state = str(interest.get("target_state_id", "0"))
     
     u_base = str(user.get("base_id", "0"))
     u_region = str(user.get("region_id", "0"))
@@ -205,10 +205,10 @@ def _intention_matches_user(intention: dict, user: dict) -> bool:
         return False
 
     # 2. Validação de Perfil Profissional (Área, Regime, Cargo)
-    t_dept = str(intention.get("target_department_id", "0"))
-    t_regime = str(intention.get("target_regime_id", "0"))
-    # t_role = str(intention.get("target_role_id", "0"))
-    # t_type = str(intention.get("target_role_type_id", "0"))
+    t_dept = str(interest.get("target_department_id", "0"))
+    t_regime = str(interest.get("target_regime_id", "0"))
+    # t_role = str(interest.get("target_role_id", "0"))
+    # t_type = str(interest.get("target_role_type_id", "0"))
 
     if t_dept != "0" and t_dept != str(user.get("department_id", "0")): return False
     if t_regime != "0" and t_regime != str(user.get("regime_id", "0")): return False
@@ -233,8 +233,8 @@ async def _dfs_find_cycle(r, start_username, start_base, current, path, max_dept
     if current_user.get("state", "permuta") == "liberado":
         return None
 
-    current_intentions = await db.get_user_intentions(r, current)
-    if not current_intentions:
+    current_interests = await db.get_user_interests(r, current)
+    if not current_interests:
         return None
 
     new_path = path + [current]
@@ -246,7 +246,7 @@ async def _dfs_find_cycle(r, start_username, start_base, current, path, max_dept
     cycle_closes = False
     # TRAVA 2: O ciclo SÓ fecha se o usuário que iniciou a busca FOR 'permuta'.
     # Se o start_user for 'liberado', ele não abre o espaço necessário para abrigar o último da cadeia.
-    if start_state == "permuta" and start_user and any(_intention_matches_user(i, start_user) for i in current_intentions):
+    if start_state == "permuta" and start_user and any(_interest_matches_user(i, start_user) for i in current_interests):
         cycle_closes = True
 
     if cycle_closes and len(new_path) >= 2:
@@ -254,8 +254,8 @@ async def _dfs_find_cycle(r, start_username, start_base, current, path, max_dept
 
     # Continua DFS
     next_candidates = set()
-    for intent in current_intentions:
-        next_candidates.update(await _get_candidates(r, current_user, intent))
+    for interest in current_interests:
+        next_candidates.update(await _get_candidates(r, current_user, interest))
     next_candidates -= set(new_path)
 
     for nxt in next_candidates:
@@ -266,8 +266,8 @@ async def _dfs_find_cycle(r, start_username, start_base, current, path, max_dept
     return None
 
 
-def _targets_base(intention: dict, base_id: str) -> bool:
-    t = str(intention.get("target_base_id", "0"))
+def _targets_base(interest: dict, base_id: str) -> bool:
+    t = str(interest.get("target_base_id", "0"))
     return t == "0" or t == base_id
 
 

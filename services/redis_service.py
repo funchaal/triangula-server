@@ -78,26 +78,26 @@ async def get_all_metadata(r) -> dict:
     return metadata
 
 
-async def get_map_intentions(r) -> list:
+async def get_map_interests(r) -> list:
     """
-    Deriva arcos do mapa a partir das intenções ativas.
+    Deriva arcos do mapa a partir dos interesses ativas.
     Agrupa por (from_key, to_key) — sem duplicatas.
     Usuários com state='liberado' também geram arcos de saída.
     """
-    all_keys = await r.keys("intention:*")
+    all_keys = await r.keys("interest:*")
     if not all_keys:
         return []
 
     pipe = r.pipeline()
     for k in all_keys:
         pipe.hgetall(k)
-    intentions = await pipe.execute()
+    interests = await pipe.execute()
 
     arc_counts = {}
-    for intent in intentions:
-        if not intent:
+    for interest in interests:
+        if not interest:
             continue
-        username = intent.get("username")
+        username = interest.get("username")
         if not username:
             continue
         user = await r.hgetall(f"user:{username}")
@@ -107,9 +107,9 @@ async def get_map_intentions(r) -> list:
         if not from_base or from_base == "0":
             continue
 
-        target_base   = intent.get("target_base_id",   "0")
-        target_region = intent.get("target_region_id", "0")
-        target_state  = intent.get("target_state_id",  "0")
+        target_base   = interest.get("target_base_id",   "0")
+        target_region = interest.get("target_region_id", "0")
+        target_state  = interest.get("target_state_id",  "0")
 
         if target_base != "0":
             to_key = f"base:{target_base}"
@@ -177,41 +177,41 @@ async def add_user_to_indexes(r, username: str, user: dict):
     await pipe.execute()
 
 
-# ─── Intenções ────────────────────────────────────────────────────────────────
+# ─── Interesses ────────────────────────────────────────────────────────────────
 
-async def save_intention(r, username: str, intention: dict) -> str:
-    intention_id = str(uuid.uuid4())
-    intention["id"]       = intention_id
-    intention["username"] = username
+async def save_interest(r, username: str, interest: dict) -> str:
+    interest_id = str(uuid.uuid4())
+    interest["id"]       = interest_id
+    interest["username"] = username
     pipe = r.pipeline()
-    pipe.hset(f"intention:{intention_id}", mapping={k: str(v) for k, v in intention.items()})
-    pipe.sadd(f"user:{username}:intentions", intention_id)
+    pipe.hset(f"interest:{interest_id}", mapping={k: str(v) for k, v in interest.items()})
+    pipe.sadd(f"user:{username}:interests", interest_id)
     await pipe.execute()
-    return intention_id
+    return interest_id
 
-async def delete_intention(r, username: str, intention_id: str) -> Optional[dict]:
-    """Deleta intenção e retorna seus dados (para uso no recálculo)."""
-    if not await r.sismember(f"user:{username}:intentions", intention_id):
+async def delete_interest(r, username: str, interest_id: str) -> Optional[dict]:
+    """Deleta e retorna seus dados (para uso no recálculo)."""
+    if not await r.sismember(f"user:{username}:interests", interest_id):
         return None
-    intention = await r.hgetall(f"intention:{intention_id}")
+    interest = await r.hgetall(f"interest:{interest_id}")
     pipe = r.pipeline()
-    pipe.srem(f"user:{username}:intentions", intention_id)
-    pipe.delete(f"intention:{intention_id}")
+    pipe.srem(f"user:{username}:interests", interest_id)
+    pipe.delete(f"interest:{interest_id}")
     await pipe.execute()
-    return intention
+    return interest
 
-async def get_user_intentions(r, username: str) -> list:
-    ids = await r.smembers(f"user:{username}:intentions")
+async def get_user_interests(r, username: str) -> list:
+    ids = await r.smembers(f"user:{username}:interests")
     if not ids:
         return []
     pipe = r.pipeline()
     for iid in ids:
-        pipe.hgetall(f"intention:{iid}")
+        pipe.hgetall(f"interest:{iid}")
     return [res for res in await pipe.execute() if res]
 
-async def get_all_intentions(r) -> list:
-    """Retorna todas as intenções do sistema."""
-    keys = await r.keys("intention:*")
+async def get_all_interests(r) -> list:
+    """Retorna todas os interesses do sistema."""
+    keys = await r.keys("interest:*")
     if not keys:
         return []
     pipe = r.pipeline()

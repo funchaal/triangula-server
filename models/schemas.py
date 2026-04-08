@@ -49,7 +49,7 @@ class UpdateMePayload(BaseModel):
     observations:   Optional[str]                          = None
 
 
-class IntentionPayload(BaseModel):
+class InterestPayload(BaseModel):
     target_base_id:       str = "0"
     target_region_id:     int = 0
     target_state_id:      int = 0

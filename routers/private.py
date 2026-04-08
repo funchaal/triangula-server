@@ -2,7 +2,7 @@ import asyncio
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from core.config import get_redis
 from core.security import get_current_username
-from models.schemas import UpdateMePayload, IntentionPayload, AddMetadataPayload
+from models.schemas import UpdateMePayload, InterestPayload, AddMetadataPayload
 from services import redis_service as db
 from services.match_service import recalculate_matches_for_user
 
@@ -58,21 +58,21 @@ async def update_me(
 
 
 
-# ─── POST /api/intentions ─────────────────────────────────────────────────────
+# ─── POST /api/interests ─────────────────────────────────────────────────────
 
-@router.post("/intentions")
-async def create_intention(
-    payload: IntentionPayload,
+@router.post("/interests")
+async def create_interest(
+    payload: InterestPayload,
     username: str = Depends(get_current_username),
     r=Depends(get_redis),
 ):
-    intention_data = payload.model_dump()
-    intention_id   = await db.save_intention(r, username, intention_data)
+    interest_data = payload.model_dump()
+    interest_id   = await db.save_interest(r, username, interest_data)
 
     # Recálculo inteligente em foreground para retornar estado atualizado
     await recalculate_matches_for_user(r, username)
 
-    intentions = await db.get_user_intentions(r, username)
+    interests = await db.get_user_interests(r, username)
     matches    = await db.get_user_matches(r, username)
 
     complete_matches = []
@@ -88,31 +88,31 @@ async def create_intention(
         complete_matches.append(obj)
     
     return {
-        "intention_id": intention_id, 
-        "intentions": intentions, 
+        "interest_id": interest_id, 
+        "interests": interests, 
         "matches": complete_matches
     }
 
 
-# ─── DELETE /api/intentions/{intention_id} ────────────────────────────────────
+# ─── DELETE /api/interests/{interest_id} ────────────────────────────────────
 
-@router.delete("/intentions/{intention_id}")
-async def delete_intention(
-    intention_id: str,
+@router.delete("/interests/{interest_id}")
+async def delete_interest(
+    interest_id: str,
     username: str = Depends(get_current_username),
     r=Depends(get_redis),
 ):
-    deleted_intent = await db.delete_intention(r, username, intention_id)
-    if deleted_intent is None:
-        raise HTTPException(status_code=403, detail="Intenção não encontrada ou sem permissão")
+    deleted_interest = await db.delete_interest(r, username, interest_id)
+    if deleted_interest is None:
+        raise HTTPException(status_code=403, detail="Interesse não encontrada ou sem permissão")
 
-    # Invalida matches do usuário (podem ter sido criados por essa intenção)
+    # Invalida matches do usuário (podem ter sido criados por esse interesse)
     # await db.invalidate_matches_containing(r, username)
 
     # Recálculo inteligente em foreground para retornar estado atualizado
     await recalculate_matches_for_user(r, username)
 
-    intentions = await db.get_user_intentions(r, username)
+    interests = await db.get_user_interests(r, username)
     matches    = await db.get_user_matches(r, username)
 
     complete_matches = []
@@ -127,7 +127,7 @@ async def delete_intention(
             obj["chain"].append({ **u, **user_info })
         complete_matches.append(obj)
 
-    return {"intention_id": intention_id, "intentions": intentions, "matches": complete_matches}
+    return {"interest_id": interest_id, "interests": interests, "matches": complete_matches}
 
 
 # ─── POST /api/config/add-metadata (Admin) ────────────────────────────────────

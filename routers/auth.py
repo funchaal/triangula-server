@@ -15,7 +15,7 @@ router = APIRouter(prefix="/auth")
 async def login(payload: LoginPayload, r=Depends(get_redis)):
     """
     Bootstrap do usuário autenticado.
-    Retorna token + perfil + intenções + matches em uma única resposta.
+    Retorna token + perfil + interesses + matches em uma única resposta.
     """
     user = await db.get_user_by_username(r, payload.username)
 
@@ -26,7 +26,7 @@ async def login(payload: LoginPayload, r=Depends(get_redis)):
         )
 
     token = create_token(payload.username)
-    intentions, matches = await _fetch_user_data(r, payload.username)
+    interests, matches = await _fetch_user_data(r, payload.username)
 
     complete_matches = []
 
@@ -43,7 +43,7 @@ async def login(payload: LoginPayload, r=Depends(get_redis)):
     return {
         "token": token,
         "user": _safe_user(user),
-        "intentions": intentions,
+        "interests": interests,
         "matches": complete_matches,
     }
 
@@ -77,7 +77,7 @@ async def register(payload: RegisterPayload, r=Depends(get_redis)):
     return {
         "token": token,
         "user": _safe_user(user_data),
-        "intentions": [],
+        "interests": [],
         "matches": [],
     }
 
@@ -95,7 +95,7 @@ async def restore_session(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    intentions, matches = await _fetch_user_data(r, username)
+    interests, matches = await _fetch_user_data(r, username)
 
     complete_matches = []
 
@@ -113,7 +113,7 @@ async def restore_session(
 
     return {
         "user": _safe_user(user),
-        "intentions": intentions,
+        "interests": interests,
         "matches": complete_matches,
     }
 
@@ -171,7 +171,7 @@ async def reset_password(payload: ResetPasswordPayload, r=Depends(get_redis)):
 
 async def _fetch_user_data(r, username: str):
     return await asyncio.gather(
-        db.get_user_intentions(r, username),
+        db.get_user_interests(r, username),
         db.get_user_matches(r, username),
     )
 
