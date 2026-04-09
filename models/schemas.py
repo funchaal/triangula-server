@@ -1,11 +1,9 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Literal
 
-
 class LoginPayload(BaseModel):
     username: str
     password: str
-
 
 class RegisterPayload(BaseModel):
     username: str
@@ -15,17 +13,17 @@ class RegisterPayload(BaseModel):
     name: str
     user_key: str
     state: str
-    base_id: str
-    region_id: int
-    state_id: int
-    role_id: int
-    role_type_id: int
-    department_id: int
-    regime_id: int
-    observations: str
-
-
-
+    
+    # Tornamos os IDs e observações opcionais com valores padrão
+    # para evitar o erro 422 se o frontend omitir o campo no payload
+    base_id: Optional[str] = "0"
+    region_id: Optional[int] = 0
+    state_id: Optional[int] = 0
+    role_id: Optional[int] = 0
+    role_type_id: Optional[int] = 0
+    department_id: Optional[int] = 0
+    regime_id: Optional[int] = 0
+    observations: Optional[str] = ""
 
 
 class UpdateMePayload(BaseModel):
@@ -34,7 +32,7 @@ class UpdateMePayload(BaseModel):
     email:         Optional[EmailStr]                     = None
     # Identificação
     name:          Optional[str]                          = None  # Nome completo
-    user_key:           Optional[str]                          = None  # Chave funcional ex: CM0E
+    user_key:      Optional[str]                          = None  # Chave funcional ex: CM0E
     # Status de permuta
     state:         Optional[Literal["permuta","liberado"]] = None
     # Localização
@@ -46,7 +44,7 @@ class UpdateMePayload(BaseModel):
     role_type_id:  Optional[int]                          = None
     department_id: Optional[int]                          = None
     regime_id:     Optional[int]                          = None
-    observations:   Optional[str]                          = None
+    observations:  Optional[str]                          = None
 
 
 class InterestPayload(BaseModel):
@@ -57,7 +55,7 @@ class InterestPayload(BaseModel):
     target_role_type_id:  int = 0
     target_department_id: int = 0
     target_regime_id:     int = 0
-    observations:          str = ""
+    observations:         str = ""
 
 
 class ForgotPasswordPayload(BaseModel):

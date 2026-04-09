@@ -7,7 +7,7 @@ import json
 import uuid
 from typing import Optional
 
-META_KEYS = ["roles", "role_types", "departments", "work_regimes"]
+META_KEYS = ["role_types", "departments", "work_regimes"]
 
 
 # ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -29,17 +29,21 @@ async def get_all_metadata(r) -> dict:
     pipe.smembers("meta:locations:list")
     pipe.smembers("meta:regions:list")
     pipe.smembers("meta:states:list")
+    # Adicionado a busca da lista de roles
+    pipe.smembers("meta:roles:list")
     results = await pipe.execute()
 
     metadata = {META_KEYS[i]: results[i] for i in range(len(META_KEYS))}
-    location_ids = results[-3]
-    region_ids   = results[-2]
-    state_ids    = results[-1]
+    location_ids = results[-4]
+    region_ids   = results[-3]
+    state_ids    = results[-2]
+    role_ids     = results[-1] # Pega os IDs da lista de roles
 
     pipe2 = r.pipeline()
     for lid in location_ids:  pipe2.hgetall(f"meta:locations:{lid}")
     for rid in region_ids:    pipe2.hgetall(f"meta:regions:{rid}")
     for sid in state_ids:     pipe2.hgetall(f"meta:states:{sid}")
+    for roid in role_ids:     pipe2.hgetall(f"meta:roles:{roid}") # Pega os dados de cada role
     res2 = await pipe2.execute()
 
     nl, nr, ns = len(location_ids), len(region_ids), len(state_ids)
@@ -65,18 +69,28 @@ async def get_all_metadata(r) -> dict:
             }
 
     states_meta = {}
-    for sid, d in zip(state_ids, res2[nl+nr:]):
+    for sid, d in zip(state_ids, res2[nl+nr:nl+nr+ns]):
         if d:
             states_meta[sid] = {
                 "name":   d.get("name", sid),
                 "coords": [float(d.get("lng", 0)), float(d.get("lat", 0))],
             }
 
+    # Novo parse para popular o dicionário de roles com name e role_type_id
+    roles = {}
+    for roid, d in zip(role_ids, res2[nl+nr+ns:]):
+        if d:
+            roles[roid] = {
+                "name": d.get("name", roid),
+                "role_type_id": d.get("role_type_id")
+            }
+
     metadata["locations"] = locations
     metadata["regions"]   = regions
     metadata["states"]    = states_meta
+    metadata["roles"]     = roles # Injetado manualmente com o formato estruturado
+    
     return metadata
-
 
 async def get_map_interests(r) -> list:
     """
