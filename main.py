@@ -19,6 +19,6 @@ app.include_router(auth.router,    prefix="/api")           # POST /api/auth/*
 app.include_router(private.router, prefix="/api")           # PUT  /api/users/me, etc.
 
 
-@app.get("/")
+@app.get("/health")
 async def health():
-    return {"status": "ok", "service": "Triangula API v3"}
+    return {"status": "ok", "service": "Triangula API"}
