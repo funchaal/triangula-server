@@ -1,6 +1,15 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import public, auth, private
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+logging.info("Iniciando Triangula API")
 
 app = FastAPI(title="Triangula API", version="3.0.0")
 

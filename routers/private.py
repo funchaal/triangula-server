@@ -5,6 +5,8 @@ from core.security import get_current_username
 from models.schemas import UpdateMePayload, InterestPayload, AddMetadataPayload
 from services import redis_service as db
 from services.match_service import recalculate_matches_for_user
+import logging
+
 
 router = APIRouter()
 
@@ -18,6 +20,8 @@ async def update_me(
     username: str = Depends(get_current_username),
     r=Depends(get_redis),
 ):
+    # logging.info('em update_me')
+    print('aaaaaaaaaaa')
     old_user = await db.get_user(r, username)
     if not old_user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -68,6 +72,8 @@ async def create_interest(
 ):
     interest_data = payload.model_dump()
     interest_id   = await db.save_interest(r, username, interest_data)
+
+    # logging.info('em interests')
 
     # Recálculo inteligente em foreground para retornar estado atualizado
     await recalculate_matches_for_user(r, username)

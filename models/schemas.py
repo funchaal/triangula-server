@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, Literal
+import re
 
 class LoginPayload(BaseModel):
     username: str
@@ -7,6 +8,13 @@ class LoginPayload(BaseModel):
 
 class RegisterPayload(BaseModel):
     username: str
+    
+    @field_validator("username")
+    @classmethod
+    def username_sem_espaco(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", v):
+            raise ValueError("username não pode conter espaços ou caracteres especiais")
+        return v.lower()
     password: str
     email: EmailStr
     phone: str
