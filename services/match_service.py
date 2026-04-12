@@ -264,6 +264,12 @@ def _interest_matches_user(interest: dict, user: dict) -> bool:
     if t_regime != "0" and t_regime != str(user.get("regime_id", "0")):
         log.debug(f"[MATCH_CHECK] reprovado no regime: interesse={t_regime} vs user={user.get('regime_id')}")
         return False
+    
+    t_role = str(interest.get("target_role_id",      "0"))
+    t_role_type = str(interest.get("target_role_type_id", "0"))
+
+    if t_role != "0" and t_role != str(user.get("role_id",      "0")): return False
+    if t_role_type != "0" and t_role_type != str(user.get("role_type_id", "0")): return False
 
     return True
 

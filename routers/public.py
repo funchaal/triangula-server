@@ -151,13 +151,28 @@ async def get_base_users(
         if not u:
             continue
         users_out.append({
+            "name":        u.get("name", ""),
             "username":    u.get("username", uname),
             "role_id":     u.get("role_id"),
+            "role_type_id": u.get("role_type_id"),
             "regime_id":   u.get("regime_id"),
+            "department_id": u.get("department_id"),
             "observacoes": u.get("observacoes", ""),
-            "base_id":     u.get("base_id"),
             "phone":       u.get("phone", ""),
             "email":       u.get("email", ""),
         })
 
     return {"users": users_out}
+
+@router.get("/auth/check-username")
+async def check_username(
+    username: str = Query(..., min_length=1),
+    r=Depends(get_redis),
+):
+    """
+    Verifica se um username já está cadastrado.
+    Endpoint público — usado pelo frontend durante o registro.
+    """
+    exists = await db.username_exists(r, username)
+    return {"available": not exists}
+ 

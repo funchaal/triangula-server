@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from core.config import get_redis
 from core.security import hash_password, verify_password, create_token, get_current_username
 # Adicionando os novos payloads de recuperação de senha:
@@ -178,3 +178,16 @@ async def _fetch_user_data(r, username: str):
 
 def _safe_user(user: dict) -> dict:
     return {k: v for k, v in user.items() if k != "password_hash"}
+
+@router.get("/check-username")
+async def check_username(
+    username: str = Query(..., min_length=1),
+    r=Depends(get_redis),
+):
+    """
+    Verifica se um username já está cadastrado.
+    Endpoint público — usado pelo frontend durante o registro.
+    """
+    exists = await db.username_exists(r, username)
+    return {"available": not exists}
+ 
