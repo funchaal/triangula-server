@@ -27,6 +27,10 @@ app.include_router(public.router,  prefix="/api")           # GET  /api/init
 app.include_router(auth.router,    prefix="/api")           # POST /api/auth/*
 app.include_router(private.router, prefix="/api")           # PUT  /api/users/me, etc.
 
+@app.get("/")
+async def root():
+    return "Rafael Funchal é muito lindo! :p"
+
 
 @app.get("/health")
 async def health():

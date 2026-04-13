@@ -2,6 +2,8 @@
 Serviço de Notificação
 Dispara e-mail para todos os membros do ciclo + BCC para o log técnico.
 """
+import asyncio
+
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -30,7 +32,8 @@ async def notify_match(
     subject   = f"[Triangula] Permuta Encontrada: {chain_display}"
     body_html = _build_email_html(match, chain_display, frontend_url)
 
-    _send_email(
+    await asyncio.to_thread(
+        _send_email,
         to=recipients,
         bcc=bcc_email,
         subject=subject,
@@ -140,6 +143,7 @@ def _send_email(
                 all_recipients.append(bcc)
                 
             server.sendmail(smtp_user, all_recipients, msg.as_string())
+            print(f"[Notificação] E-mail enviado para {to}")
     except Exception as e:
         print(f"[Notificação] Falha ao enviar e-mail: {e}")
 
