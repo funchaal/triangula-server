@@ -15,6 +15,10 @@ import asyncio
 import logging
 from services import redis_service as db
 from services.notification_service import notify_match
+from core.config import get_settings
+
+settings = get_settings()
+
 
 log = logging.getLogger(__name__)
 
@@ -364,5 +368,5 @@ async def _close_match(r, chain: list) -> bool:
         if frm and to:
             await db.increment_arc(r, frm, to)
 
-    asyncio.create_task(notify_match(r, {"id": match_id, "chain": chain_data}, [u for u in users if u]))
+    asyncio.create_task(notify_match(r, {"id": match_id, "chain": chain_data}, [u for u in users if u], smtp_host=settings.smtp_host, smtp_port=settings.smtp_port, smtp_user=settings.smtp_user_matches, smtp_pass=settings.smtp_pass_matches))
     return True

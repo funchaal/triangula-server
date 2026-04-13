@@ -6,7 +6,10 @@ from core.security import hash_password, verify_password, create_token, get_curr
 from models.schemas import LoginPayload, RegisterPayload, ForgotPasswordPayload, ResetPasswordPayload
 from services import redis_service as db
 # Importando o serviço de notificação para o disparo de e-mail:
-from services import notification_service 
+from services import notification_service
+from core.config import get_settings
+
+settings = get_settings()
 
 router = APIRouter(prefix="/auth")
 
@@ -138,7 +141,11 @@ async def forgot_password(payload: ForgotPasswordPayload, r=Depends(get_redis)):
         email=user.get("email"), 
         username=payload.username, 
         token=token, 
-        frontend_url=frontend_url
+        frontend_url=frontend_url, 
+        smtp_host=settings.smtp_host, 
+        smtp_port=settings.smtp_port, 
+        smtp_user=settings.smtp_user_matches, 
+        smtp_pass=settings.smtp_pass_matches
     )
     
     return {"message": "Se o usuário existir, um e-mail de recuperação foi enviado."}
