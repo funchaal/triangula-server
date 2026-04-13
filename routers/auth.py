@@ -134,14 +134,11 @@ async def forgot_password(payload: ForgotPasswordPayload, r=Depends(get_redis)):
     
     token = await db.save_password_reset_token(r, payload.username)
     
-    # Dica: Substitua isso por uma variável de ambiente no seu config, ex: settings.frontend_url
-    frontend_url = "http://localhost:5173" 
-    
     await notification_service.notify_password_reset(
         email=user.get("email"), 
         username=payload.username, 
         token=token, 
-        frontend_url=frontend_url, 
+        frontend_url=settings.frontend_url, 
         smtp_host=settings.smtp_host, 
         smtp_port=settings.smtp_port, 
         smtp_user=settings.smtp_user_matches, 

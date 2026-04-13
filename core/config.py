@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     smtp_pass_recovery: str = ""
     bcc_email: str = ""
 
+    frontend_url: str = "https://triangula.vercel.app/"
+
     class Config:
         env_file = ".env"
 
