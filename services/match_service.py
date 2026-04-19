@@ -368,5 +368,5 @@ async def _close_match(r, chain: list) -> bool:
         if frm and to:
             await db.increment_arc(r, frm, to)
 
-    asyncio.create_task(notify_match(match={"id": match_id, "chain": chain_data}, users=[u for u in users if u], frontend_url=settings.frontend_url, smtp_host=settings.smtp_host, smtp_port=settings.smtp_port, smtp_user=settings.smtp_user_matches, smtp_pass=settings.smtp_pass_matches))
+    # asyncio.create_task(notify_match(match={"id": match_id, "chain": chain_data}, users=[u for u in users if u]))
     return True

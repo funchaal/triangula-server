@@ -9,12 +9,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 dias
 
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user_matches: str = ""
-    smtp_pass_matches: str = ""
-    smtp_user_recovery: str = ""
-    smtp_pass_recovery: str = ""
+    resend_api_key: str = ""
+    email_from: str = "onboarding@resend.dev"
     bcc_email: str = ""
 
     frontend_url: str = "https://triangula.vercel.app/"

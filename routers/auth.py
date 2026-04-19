@@ -126,26 +126,21 @@ async def forgot_password(payload: ForgotPasswordPayload, r=Depends(get_redis)):
     """
     Gera um token de recuperação e envia por e-mail.
     """
-    user = await db.get_user_by_username(r, payload.username)
+    # user = await db.get_user_by_username(r, payload.username)
     
-    # Prática de segurança: não revelar se o usuário existe ou não para evitar user enumeration
-    if not user:
-        return {"message": "Se o usuário existir, um e-mail de recuperação foi enviado."}
+    # # Prática de segurança: não revelar se o usuário existe ou não para evitar user enumeration
+    # if not user:
+    #     return {"message": "Se o usuário existir, um e-mail de recuperação foi enviado."}
     
-    token = await db.save_password_reset_token(r, payload.username)
+    # token = await db.save_password_reset_token(r, payload.username)
     
-    await notification_service.notify_password_reset(
-        email=user.get("email"), 
-        username=payload.username, 
-        token=token, 
-        frontend_url=settings.frontend_url, 
-        smtp_host=settings.smtp_host, 
-        smtp_port=settings.smtp_port, 
-        smtp_user=settings.smtp_user_matches, 
-        smtp_pass=settings.smtp_pass_matches
-    )
-    
-    return {"message": "Se o usuário existir, um e-mail de recuperação foi enviado."}
+    # await notification_service.notify_password_reset(
+    #     email=user.get("email"),
+    #     username=payload.username,
+    #     token=token
+    # )    
+    # return {"message": "Se o usuário existir, um e-mail de recuperação foi enviado."}
+    return { "message": "O reset de senha não está operando no momento." }
 
 
 @router.post("/reset-password")

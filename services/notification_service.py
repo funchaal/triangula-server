@@ -3,21 +3,18 @@ Serviço de Notificação
 Dispara e-mail para todos os membros do ciclo + BCC para o log técnico.
 """
 import asyncio
+import resend
 
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from core.config import get_settings
 
 async def notify_match(
     match: dict, 
     users: list, 
-    frontend_url: str,
-    smtp_host: str,
-    smtp_port: int,
-    smtp_user: str,
-    smtp_pass: str,
-    bcc_email: str = ""
+    frontend_url: str = None
 ):
+    settings = get_settings()
+    frontend_url = frontend_url or settings.frontend_url
+    
     # Monta mapa username → email a partir da lista de users
     email_map = {u["username"]: u["email"] for u in users if u and u.get("email") and u.get("username")}
     recipients = list(email_map.values())
@@ -35,26 +32,18 @@ async def notify_match(
     await asyncio.to_thread(
         _send_email,
         to=recipients,
-        bcc=bcc_email,
         subject=subject,
-        html=body_html,
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        smtp_user=smtp_user,
-        smtp_pass=smtp_pass
+        html=body_html
     )
-
 
 async def notify_password_reset(
     email: str, 
     username: str, 
     token: str, 
-    frontend_url: str,
-    smtp_host: str,
-    smtp_port: int,
-    smtp_user: str,
-    smtp_pass: str
+    frontend_url: str = None
 ):
+    settings = get_settings()
+    frontend_url = frontend_url or settings.frontend_url
     reset_link = f"{frontend_url}/login?token={token}"
     subject = "[Triangula] Recuperação de Senha"
     
@@ -101,52 +90,39 @@ async def notify_password_reset(
 
     _send_email(
         to=[email],
-        bcc="",
         subject=subject,
-        html=body_html,
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        smtp_user=smtp_user,
-        smtp_pass=smtp_pass
+        html=body_html
     )
-
 
 def _send_email(
     to: list, 
-    bcc: str, 
     subject: str, 
     html: str, 
-    smtp_host: str, 
-    smtp_port: int, 
-    smtp_user: str, 
-    smtp_pass: str
+    bcc: str = None,
+    from_email: str = None
 ):
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"]    = smtp_user
-    msg["To"]      = ", ".join(to)
+    settings = get_settings()
+    resend.api_key = settings.resend_api_key
     
-    if bcc:
-        msg["Bcc"] = bcc
+    email_from = from_email or settings.email_from
+    bcc_addr = bcc if bcc is not None else settings.bcc_email
 
-    # Anexa apenas o HTML (sem arquivos soltos para evitar spam)
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    params = {
+        "from": email_from,
+        "to": to,
+        "subject": subject,
+        "html": html
+    }
+    
+    if bcc_addr:
+        params["bcc"] = bcc_addr
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            
-            # Monta a lista final de destinatários para o envelope do SMTP
-            all_recipients = to.copy()
-            if bcc:
-                all_recipients.append(bcc)
-                
-            server.sendmail(smtp_user, all_recipients, msg.as_string())
-            print(f"[Notificação] E-mail enviado para {to}")
+        r = resend.Emails.send(params)
+        print(f"[Notificação] E-mail enviado para {to}")
+        return r
     except Exception as e:
         print(f"[Notificação] Falha ao enviar e-mail: {e}")
-
 
 def _build_email_html(match: dict, chain_display: str, frontend_url: str) -> str:
     steps_html = "".join(
