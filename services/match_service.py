@@ -13,12 +13,12 @@ Recálculo inteligente:
 """
 import asyncio
 import logging
-from services import redis_service as db
+import time                                          # ← NOVO
+from services import timed_db as db                 # ← trocado de redis_service para timed_db
 from services.notification_service import notify_match
 from core.config import get_settings
 
 settings = get_settings()
-
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 # ─── Entrada principal ────────────────────────────────────────────────────────
 
 async def recalculate_matches_for_user(r, trigger_username: str):
+    db.reset_metrics()                               # ← NOVO: zera contadores da sessão
     log.info(f"[RECALC] ▶ iniciando para '{trigger_username}'")
 
     trigger_user = await db.get_user(r, trigger_username)
@@ -95,8 +96,15 @@ async def recalculate_matches_for_user(r, trigger_username: str):
         if saved:
             new_saved += 1
 
-    log.info(f"[RECALC] ◀ concluído para '{trigger_username}' — "
-             f"novos={new_saved}, removidos={len(keys_to_delete)}, mantidos={len(valid_chain_keys) - new_saved}")
+    # ── Resumo de tempos ──────────────────────────────────────────────────────
+    m = db.get_metrics()
+    log.info(
+        f"[RECALC] ◀ concluído para '{trigger_username}' — "
+        f"novos={new_saved}, removidos={len(keys_to_delete)}, mantidos={len(valid_chain_keys) - new_saved} | "
+        f"[DB] {m['calls']} chamadas · db={m['db_ms']} ms · "      # ← tempo puro de I/O Redis
+        f"proc={m['proc_ms']} ms · "                                # ← tempo de CPU/lógica
+        f"wall={m['wall_ms']} ms"                                   # ← tempo total real
+    )
 
 
 async def _find_related_users(r, trigger_username: str, trigger_user: dict) -> set:
@@ -268,11 +276,11 @@ def _interest_matches_user(interest: dict, user: dict) -> bool:
     if t_regime != "0" and t_regime != str(user.get("regime_id", "0")):
         log.debug(f"[MATCH_CHECK] reprovado no regime: interesse={t_regime} vs user={user.get('regime_id')}")
         return False
-    
-    t_role = str(interest.get("target_role_id",      "0"))
+
+    t_role      = str(interest.get("target_role_id",      "0"))
     t_role_type = str(interest.get("target_role_type_id", "0"))
 
-    if t_role != "0" and t_role != str(user.get("role_id",      "0")): return False
+    if t_role      != "0" and t_role      != str(user.get("role_id",      "0")): return False
     if t_role_type != "0" and t_role_type != str(user.get("role_type_id", "0")): return False
 
     return True

@@ -1,7 +1,7 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import public, auth, private
+from routers import admin, public, auth, private
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +23,7 @@ app.add_middleware(
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
 
+app.include_router(admin.router,  prefix="/api")           # GET  /api/init
 app.include_router(public.router,  prefix="/api")           # GET  /api/init
 app.include_router(auth.router,    prefix="/api")           # POST /api/auth/*
 app.include_router(private.router, prefix="/api")           # PUT  /api/users/me, etc.

@@ -76,3 +76,35 @@ class ResetPasswordPayload(BaseModel):
 class AddMetadataPayload(BaseModel):
     category: str
     value: str
+
+class StatePayload(BaseModel):
+    name: str
+    lat: float
+    lng: float
+
+class RegionPayload(BaseModel):
+    name: str
+    state_id: str
+    lat: float
+    lng: float
+
+class LocationPayload(BaseModel):
+    name: str
+    region_id: str
+    state_id: str
+    type: str           # "Onshore" | "Offshore"
+    lat: float
+    lng: float
+
+class RoleTypePayload(BaseModel):
+    name: str
+ 
+class RolePayload(BaseModel):
+    name: str
+    role_type_id: str
+
+class DepartmentPayload(BaseModel):
+    name: str
+
+class UserAdminPayload(BaseModel):
+    is_admin: bool
