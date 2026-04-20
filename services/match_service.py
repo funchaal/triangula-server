@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from services import redis_service as db
+import time                                          # ← NOVO
+from services import timed_db as db                 # ← trocado de redis_service para timed_db
 from services.notification_service import notify_match
 from core.config import get_settings
 
@@ -12,6 +13,7 @@ log = logging.getLogger(__name__)
 # ─── Entrada principal ────────────────────────────────────────────────────────
 
 async def recalculate_matches_for_user(r, trigger_username: str):
+    db.reset_metrics()                               # ← NOVO: zera contadores da sessão
     log.info(f"[RECALC] ▶ iniciando para '{trigger_username}'")
 
     trigger_user = await db.get_user(r, trigger_username)
@@ -111,8 +113,15 @@ async def recalculate_matches_for_user(r, trigger_username: str):
     log.info(f"[RECALC] [⏱ {time.perf_counter()-t6:.3f}s] salvamento concluído — "
              f"novos={new_saved}, já existiam={len(valid_chain_keys) - new_saved}")
 
-    log.info(f"[RECALC] ◀ concluído para '{trigger_username}' — "
-             f"novos={new_saved}, removidos={len(keys_to_delete)}, mantidos={len(valid_chain_keys) - new_saved}")
+    # ── Resumo de tempos ──────────────────────────────────────────────────────
+    m = db.get_metrics()
+    log.info(
+        f"[RECALC] ◀ concluído para '{trigger_username}' — "
+        f"novos={new_saved}, removidos={len(keys_to_delete)}, mantidos={len(valid_chain_keys) - new_saved} | "
+        f"[DB] {m['calls']} chamadas · db={m['db_ms']} ms · "      # ← tempo puro de I/O Redis
+        f"proc={m['proc_ms']} ms · "                                # ← tempo de CPU/lógica
+        f"wall={m['wall_ms']} ms"                                   # ← tempo total real
+    )
 
 
 async def _find_related_users(r, trigger_username: str, trigger_user: dict) -> set:
@@ -403,5 +412,5 @@ async def _close_match(r, chain: list) -> bool:
         if frm and to:
             await db.increment_arc(r, frm, to)
 
-    asyncio.create_task(notify_match(match={"id": match_id, "chain": chain_data}, users=[u for u in users if u], frontend_url=settings.frontend_url, smtp_host=settings.smtp_host, smtp_port=settings.smtp_port, smtp_user=settings.smtp_user_matches, smtp_pass=settings.smtp_pass_matches))
+    # asyncio.create_task(notify_match(match={"id": match_id, "chain": chain_data}, users=[u for u in users if u]))
     return True
