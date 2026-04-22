@@ -3,7 +3,7 @@ routers/admin.py — Rotas de administração (apenas is_admin=true)
 Gerencia estados, regiões e bases (locations) do seed.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from core.security import get_current_username          # seu dep. de autenticação
+from core.security import get_current_username
 from services import redis_service as db
 from models.schemas import StatePayload, RegionPayload, LocationPayload, UserAdminPayload, RoleTypePayload, RolePayload, DepartmentPayload
 from core.config import get_redis
@@ -11,16 +11,23 @@ from core.config import get_redis
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async def _next_free_id(r, counter_key: str, exists_fn) -> str:
+    """Incrementa o contador até encontrar um ID que não colida."""
+    new_id = str(await r.incr(counter_key))
+    while await exists_fn(new_id):
+        new_id = str(await r.incr(counter_key))
+    return new_id
+
+
 # ─── Dependência de guarda ────────────────────────────────────────────────────
 
-async def require_admin(username: str = Depends(get_current_username), r = Depends(get_redis)):
+async def require_admin(username: str = Depends(get_current_username), r=Depends(get_redis)):
     user = await db.get_user(r, username)
     if not user or str(user.get("is_admin", "false")).lower() != "true":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
     return user
-
-
-
 
 
 # ─── Estados ──────────────────────────────────────────────────────────────────
@@ -37,7 +44,10 @@ async def list_states(r=Depends(get_redis)):
 
 @router.post("/states", dependencies=[Depends(require_admin)])
 async def create_state(payload: StatePayload, r=Depends(get_redis)):
-    new_id = str(await r.incr("meta:counters:states"))
+    new_id = await _next_free_id(
+        r, "meta:counters:states",
+        lambda i: r.exists(f"meta:states:{i}")
+    )
     mapping = {"name": payload.name, "lat": str(payload.lat), "lng": str(payload.lng)}
     pipe = r.pipeline()
     pipe.hset(f"meta:states:{new_id}", mapping=mapping)
@@ -48,8 +58,7 @@ async def create_state(payload: StatePayload, r=Depends(get_redis)):
 
 @router.put("/states/{state_id}", dependencies=[Depends(require_admin)])
 async def update_state(state_id: str, payload: StatePayload, r=Depends(get_redis)):
-    exists = await r.exists(f"meta:states:{state_id}")
-    if not exists:
+    if not await r.exists(f"meta:states:{state_id}"):
         raise HTTPException(status_code=404, detail="Estado não encontrado.")
     mapping = {"name": payload.name, "lat": str(payload.lat), "lng": str(payload.lng)}
     await r.hset(f"meta:states:{state_id}", mapping=mapping)
@@ -79,7 +88,10 @@ async def list_regions(r=Depends(get_redis)):
 
 @router.post("/regions", dependencies=[Depends(require_admin)])
 async def create_region(payload: RegionPayload, r=Depends(get_redis)):
-    new_id = str(await r.incr("meta:counters:regions"))
+    new_id = await _next_free_id(
+        r, "meta:counters:regions",
+        lambda i: r.exists(f"meta:regions:{i}")
+    )
     mapping = {
         "name": payload.name, "state_id": payload.state_id,
         "lat": str(payload.lat), "lng": str(payload.lng),
@@ -126,8 +138,10 @@ async def list_locations(r=Depends(get_redis)):
 
 @router.post("/locations", dependencies=[Depends(require_admin)])
 async def create_location(payload: LocationPayload, r=Depends(get_redis)):
-    # ID gerado como slug numérico incremental para manter o padrão
-    new_id = str(await r.incr("meta:counters:locations"))
+    new_id = await _next_free_id(
+        r, "meta:counters:locations",
+        lambda i: r.exists(f"meta:locations:{i}")
+    )
     mapping = {
         "name": payload.name, "region_id": payload.region_id,
         "state_id": payload.state_id, "type": payload.type,
@@ -161,30 +175,35 @@ async def delete_location(location_id: str, r=Depends(get_redis)):
     await pipe.execute()
     return {"deleted": location_id}
 
+
 # ─── Tipos de Cargo (role_types) ──────────────────────────────────────────────
-# Hash simples: meta:role_types  { "1": "Nível Técnico", "2": "Nível Superior" }
- 
+
 @router.get("/role-types", dependencies=[Depends(require_admin)])
 async def list_role_types(r=Depends(get_redis)):
     data = await r.hgetall("meta:role_types")
     return sorted([{"id": k, "name": v} for k, v in data.items()], key=lambda x: x["name"])
- 
+
+
 @router.post("/role-types", dependencies=[Depends(require_admin)])
 async def create_role_type(payload: RoleTypePayload, r=Depends(get_redis)):
-    new_id = str(await r.incr("meta:counters:role_types"))
+    new_id = await _next_free_id(
+        r, "meta:counters:role_types",
+        lambda i: r.hexists("meta:role_types", i)
+    )
     await r.hset("meta:role_types", new_id, payload.name)
     return {"id": new_id, "name": payload.name}
- 
+
+
 @router.put("/role-types/{role_type_id}", dependencies=[Depends(require_admin)])
 async def update_role_type(role_type_id: str, payload: RoleTypePayload, r=Depends(get_redis)):
     if not await r.hexists("meta:role_types", role_type_id):
         raise HTTPException(status_code=404, detail="Tipo de cargo não encontrado.")
     await r.hset("meta:role_types", role_type_id, payload.name)
     return {"id": role_type_id, "name": payload.name}
- 
+
+
 @router.delete("/role-types/{role_type_id}", dependencies=[Depends(require_admin)])
 async def delete_role_type(role_type_id: str, r=Depends(get_redis)):
-    # Bloqueia se houver cargos vinculados
     role_ids = await r.smembers("meta:roles:list")
     pipe = r.pipeline()
     for rid in role_ids:
@@ -198,12 +217,10 @@ async def delete_role_type(role_type_id: str, r=Depends(get_redis)):
         )
     await r.hdel("meta:role_types", role_type_id)
     return {"deleted": role_type_id}
- 
- 
+
+
 # ─── Cargos (roles) ───────────────────────────────────────────────────────────
-# Hashes individuais: meta:roles:{id}  { name, role_type_id }
-# Índice de IDs: meta:roles:list (set)
- 
+
 @router.get("/roles", dependencies=[Depends(require_admin)])
 async def list_roles(r=Depends(get_redis)):
     ids = await r.smembers("meta:roles:list")
@@ -212,19 +229,24 @@ async def list_roles(r=Depends(get_redis)):
         pipe.hgetall(f"meta:roles:{rid}")
     results = await pipe.execute()
     return [{"id": rid, **data} for rid, data in zip(ids, results) if data]
- 
+
+
 @router.post("/roles", dependencies=[Depends(require_admin)])
 async def create_role(payload: RolePayload, r=Depends(get_redis)):
     if not await r.hexists("meta:role_types", payload.role_type_id):
         raise HTTPException(status_code=400, detail="Tipo de cargo inválido.")
-    new_id = str(await r.incr("meta:counters:roles"))
+    new_id = await _next_free_id(
+        r, "meta:counters:roles",
+        lambda i: r.exists(f"meta:roles:{i}")
+    )
     mapping = {"name": payload.name, "role_type_id": payload.role_type_id}
     pipe = r.pipeline()
     pipe.hset(f"meta:roles:{new_id}", mapping=mapping)
     pipe.sadd("meta:roles:list", new_id)
     await pipe.execute()
     return {"id": new_id, **mapping}
- 
+
+
 @router.put("/roles/{role_id}", dependencies=[Depends(require_admin)])
 async def update_role(role_id: str, payload: RolePayload, r=Depends(get_redis)):
     if not await r.exists(f"meta:roles:{role_id}"):
@@ -234,7 +256,8 @@ async def update_role(role_id: str, payload: RolePayload, r=Depends(get_redis)):
     mapping = {"name": payload.name, "role_type_id": payload.role_type_id}
     await r.hset(f"meta:roles:{role_id}", mapping=mapping)
     return {"id": role_id, **mapping}
- 
+
+
 @router.delete("/roles/{role_id}", dependencies=[Depends(require_admin)])
 async def delete_role(role_id: str, r=Depends(get_redis)):
     pipe = r.pipeline()
@@ -243,28 +266,33 @@ async def delete_role(role_id: str, r=Depends(get_redis)):
     await pipe.execute()
     return {"deleted": role_id}
 
-# ─── Departamentos ────────────────────────────────────────────────────────────
-# Hash simples: meta:departments  { "1": "POÇOS", "2": "SUB", ... }
 
- 
+# ─── Departamentos ────────────────────────────────────────────────────────────
+
 @router.get("/departments", dependencies=[Depends(require_admin)])
 async def list_departments(r=Depends(get_redis)):
     data = await r.hgetall("meta:departments")
     return sorted([{"id": k, "name": v} for k, v in data.items()], key=lambda x: x["name"])
- 
+
+
 @router.post("/departments", dependencies=[Depends(require_admin)])
 async def create_department(payload: DepartmentPayload, r=Depends(get_redis)):
-    new_id = str(await r.incr("meta:counters:departments"))
+    new_id = await _next_free_id(
+        r, "meta:counters:departments",
+        lambda i: r.hexists("meta:departments", i)
+    )
     await r.hset("meta:departments", new_id, payload.name)
     return {"id": new_id, "name": payload.name}
- 
+
+
 @router.put("/departments/{dept_id}", dependencies=[Depends(require_admin)])
 async def update_department(dept_id: str, payload: DepartmentPayload, r=Depends(get_redis)):
     if not await r.hexists("meta:departments", dept_id):
         raise HTTPException(status_code=404, detail="Departamento não encontrado.")
     await r.hset("meta:departments", dept_id, payload.name)
     return {"id": dept_id, "name": payload.name}
- 
+
+
 @router.delete("/departments/{dept_id}", dependencies=[Depends(require_admin)])
 async def delete_department(dept_id: str, r=Depends(get_redis)):
     if not await r.hexists("meta:departments", dept_id):
@@ -272,8 +300,9 @@ async def delete_department(dept_id: str, r=Depends(get_redis)):
     await r.hdel("meta:departments", dept_id)
     return {"deleted": dept_id}
 
+
 # ─── Gerenciar admins ─────────────────────────────────────────────────────────
- 
+
 @router.patch("/users/{username}/admin", dependencies=[Depends(require_admin)])
 async def set_user_admin(username: str, payload: UserAdminPayload, r=Depends(get_redis)):
     user = await db.get_user(r, username)
@@ -281,4 +310,3 @@ async def set_user_admin(username: str, payload: UserAdminPayload, r=Depends(get
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     await r.hset(f"user:{username}", "is_admin", str(payload.is_admin).lower())
     return {"username": username, "is_admin": payload.is_admin}
- 
